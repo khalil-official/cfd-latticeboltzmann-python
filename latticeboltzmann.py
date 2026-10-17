@@ -11,6 +11,23 @@ for an isothermal fluid
 """
 
 
+def equilibrium(rho, ux, uy, cxs, cys, weights, out):
+    """Write the D2Q9 equilibrium populations into a reusable output buffer."""
+    speed_sq = ux**2 + uy**2
+    for i, (cx, cy, w) in enumerate(zip(cxs, cys, weights)):
+        out[:, :, i] = (
+            rho
+            * w
+            * (
+                1
+                + 3 * (cx * ux + cy * uy)
+                + 9 * (cx * ux + cy * uy) ** 2 / 2
+                - 3 * speed_sq / 2
+            )
+        )
+    return out
+
+
 def main():
     """Lattice Boltzmann Simulation"""
 
@@ -47,6 +64,8 @@ def main():
 
     # Prep figure
     fig = plt.figure(figsize=(4, 2), dpi=80)
+    # Every population is overwritten below, so reuse this buffer each step.
+    Feq = np.empty_like(F)
 
     # Simulation Main Loop
     for it in range(Nt):
@@ -67,18 +86,7 @@ def main():
         uy = np.sum(F * cys, 2) / rho
 
         # Apply Collision
-        Feq = np.zeros(F.shape)
-        for i, cx, cy, w in zip(idxs, cxs, cys, weights):
-            Feq[:, :, i] = (
-                rho
-                * w
-                * (
-                    1
-                    + 3 * (cx * ux + cy * uy)
-                    + 9 * (cx * ux + cy * uy) ** 2 / 2
-                    - 3 * (ux**2 + uy**2) / 2
-                )
-            )
+        equilibrium(rho, ux, uy, cxs, cys, weights, Feq)
 
         F += -(1.0 / tau) * (F - Feq)
 
